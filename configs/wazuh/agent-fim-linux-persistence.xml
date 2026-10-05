@@ -1,0 +1,6 @@
+<!-- Agentic SOC: extra file-integrity monitoring for persistence on Linux agents (Kali, victim01).
+     Add inside the existing <syscheck> block of the AGENT's /var/ossec/etc/ossec.conf.
+     List the real login accounts' .ssh folders. The first scan after a restart is a silent baseline;
+     changes alert on the next scheduled scan (default every 12 h). -->
+<directories>/root/.ssh,/home/<LAB_USER>/.ssh</directories>
+<ignore type="sregex">/.ssh/known_hosts</ignore>

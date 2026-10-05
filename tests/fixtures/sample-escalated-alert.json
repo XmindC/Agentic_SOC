@@ -1,0 +1,27 @@
+{
+  "l1_verdict": "Escalated: repeated port scanning from a single external source.",
+  "alert": {
+    "rule_id": "100200",
+    "description": "Multiple failed connection attempts detected against internal host.",
+    "source_ip": "<ATTACKER_IP>",
+    "destination_ip": "<VICTIM_IP>",
+    "destination_port": 22,
+    "severity": "high",
+    "timestamp": "2026-09-19T14:32:00Z",
+    "event_type": "reconnaissance"
+  },
+  "enrichment": {
+    "suricata": {
+      "alert": "SYN scan pattern on SSH port",
+      "source_ip": "<ATTACKER_IP>",
+      "destination_ip": "<VICTIM_IP>",
+      "ports": [22, 80, 443, 445]
+    },
+    "wazuh": {
+      "auth_events": [
+        "Failed password for invalid user root from <ATTACKER_IP> port 22",
+        "Failed password for invalid user admin from <ATTACKER_IP> port 22"
+      ]
+    }
+  }
+}

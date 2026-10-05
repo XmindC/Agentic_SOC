@@ -1,0 +1,6 @@
+# Agentic SOC: append to /opt/zeek/share/zeek/site/local.zeek on victim01.
+# JSON logs, and "_" instead of "." in field names. Dotted names (id.orig_h) become data.id.orig_h,
+# which collides with data.id (mapped as keyword) in the Wazuh index: every Zeek alert is then
+# silently rejected by the indexer while logtest still looks fine.
+@load policy/tuning/json-logs.zeek
+redef Log::default_scope_sep = "_";

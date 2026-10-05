@@ -1,0 +1,5 @@
+<!-- SOC lab 2026-09-30: Mac DNS queries captured by com.soc.dnslog (tcpdump, read-only) -->
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/dns-queries.log</location>
+  </localfile>

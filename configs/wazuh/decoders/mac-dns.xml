@@ -1,0 +1,12 @@
+<!-- SOC lab 2026-09-30: append to /var/ossec/etc/decoders/local_decoder.xml on the MANAGER.
+     Parses tcpdump DNS *query* lines from the Mac's /var/log/dns-queries.log.
+     Responses (source port 53) intentionally do not match: one event per lookup. -->
+<decoder name="soc-mac-dns">
+  <prematch type="pcre2">\S+\.\d+ > \S+\.53: \d+</prematch>
+</decoder>
+
+<decoder name="soc-mac-dns-query">
+  <parent>soc-mac-dns</parent>
+  <regex type="pcre2">(\S+)\.\d+ > (\S+)\.53: \d+\S* (\w+)\? (\S+?)\.? \(</regex>
+  <order>srcip,dstip,dns_type,dns_query</order>
+</decoder>

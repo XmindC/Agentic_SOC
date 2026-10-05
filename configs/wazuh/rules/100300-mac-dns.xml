@@ -1,0 +1,11 @@
+<!-- SOC lab 2026-09-30: append to /var/ossec/etc/rules/local_rules.xml on the MANAGER.
+     Level 3 on purpose: visible in the Wazuh dashboard, BELOW the n8n integration
+     threshold (5), so DNS never opens a case or calls the model. Do not raise above 4.
+     Confirm 100300 is unused first: sudo grep -rn 'id="1003' /var/ossec/etc/rules/ -->
+<group name="soc_lab,mac_dns,">
+  <rule id="100300" level="3">
+    <decoded_as>soc-mac-dns</decoded_as>
+    <field name="dns_query">\.</field>
+    <description>Mac DNS query: $(dns_query) ($(dns_type)) from $(srcip)</description>
+  </rule>
+</group>

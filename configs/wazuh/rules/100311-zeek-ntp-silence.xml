@@ -1,0 +1,9 @@
+<!-- SOC lab 2026-10-01: silence Zeek NTP (udp/123) connection records; still in Zeek's conn.log on victim01. -->
+<group name="soc_lab,zeek,">
+  <rule id="100311" level="0">
+    <if_sid>100310</if_sid>
+    <field name="proto">^udp$</field>
+    <field name="id_resp_p">^123$</field>
+    <description>Zeek conn: NTP (udp/123) silenced (lab noise)</description>
+  </rule>
+</group>

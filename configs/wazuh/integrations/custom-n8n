@@ -1,0 +1,7 @@
+#!/bin/sh
+# Agentic SOC: Wazuh integratord -> n8n webhook.
+# Install as /var/ossec/integrations/custom-n8n, owner root:wazuh, mode 750.
+# integratord calls it as: custom-n8n <alert_file> <api_key> <hook_url> ...
+# This is the version running in the lab. A daily "Exit status was: 7" burst at 03:27 UTC is a
+# known false alarm (alerts are still delivered); do NOT add --retry, it would duplicate cases.
+curl -s -X POST -H "Content-Type: application/json" -d @"$1" "$3"

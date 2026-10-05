@@ -1,0 +1,6 @@
+<!-- Agentic SOC: ship Zeek conn.log (JSON) from victim01 to the manager. Add inside <ossec_config>
+     on the victim01 AGENT. Matched on the manager by rule 100310 (level 3, never reaches n8n). -->
+<localfile>
+  <log_format>json</log_format>
+  <location>/opt/zeek/logs/current/conn.log</location>
+</localfile>

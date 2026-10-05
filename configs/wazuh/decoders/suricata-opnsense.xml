@@ -1,0 +1,11 @@
+<!-- Agentic SOC: Suricata alerts from OPNsense arrive on the Wazuh manager by syslog (UDP 514).
+     Append to /var/ossec/etc/decoders/local_decoder.xml on the MANAGER.
+     Parent matches the syslog program name; the child hands the JSON payload to the built-in JSON decoder. -->
+<decoder name="suricata-opnsense">
+  <program_name>suricata</program_name>
+</decoder>
+
+<decoder name="suricata-opnsense-json">
+  <parent>suricata-opnsense</parent>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>

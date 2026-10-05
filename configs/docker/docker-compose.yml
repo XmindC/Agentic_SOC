@@ -1,0 +1,124 @@
+# Agentic SOC: services host stack (services01, ~/soc-stack).
+#
+# Rebuilt from the lab notes (Cortex/dockerproxy section of
+# docs/04-installation/reference/cortex-with-docker-socket-proxy.md) and StrangeBee's reference layout.
+# The live file on services01 is NOT in this repo because it holds secrets in plain text.
+# If you already run the lab, diff this against ~/soc-stack/docker-compose.yml before replacing anything.
+#
+# Every secret comes from .env (see .env.example). install.sh --role services renders and starts this.
+# Bring services up one at a time; see docs/04-installation/04-services-stack.md.
+name: soc-stack
+
+services:
+  # Docker API proxy. Cortex starts analyzer containers through this instead of the raw socket:
+  # mounting /var/run/docker.sock into Cortex made it chown the socket to uid 1001 and broke Docker on the host.
+  dockerproxy:
+    image: ${DOCKERPROXY_IMAGE}
+    container_name: dockerproxy
+    restart: unless-stopped
+    environment:
+      - CONTAINERS=1   # create and inspect analyzer containers
+      - IMAGES=1       # check the analyzer image is present
+      - POST=1         # any write request
+      - INFO=1         # without it Cortex logs "Docker is not available"
+      - EXEC=1         # read analyzer output back
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  cassandra:
+    image: ${CASSANDRA_IMAGE}
+    container_name: cassandra
+    restart: unless-stopped
+    environment:
+      - CASSANDRA_CLUSTER_NAME=TheHive
+      - MAX_HEAP_SIZE=${CASSANDRA_HEAP}
+      - HEAP_NEWSIZE=256M
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD-SHELL", "nodetool status | grep -q '^UN'"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+  # Shared by TheHive (index) and Cortex (jobs and reports). Not published to the network.
+  elasticsearch:
+    image: ${ELASTICSEARCH_IMAGE}
+    container_name: elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms${ELASTICSEARCH_HEAP} -Xmx${ELASTICSEARCH_HEAP}
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+
+  thehive:
+    image: ${THEHIVE_IMAGE}
+    container_name: thehive
+    restart: unless-stopped
+    depends_on:
+      - cassandra
+      - elasticsearch
+    ports:
+      - "9000:9000"
+    volumes:
+      - thehive_data:/opt/thp/thehive/files
+    command:
+      - --secret
+      - ${THEHIVE_SECRET}
+      - --cql-hostnames
+      - cassandra
+      - --index-backend
+      - elasticsearch
+      - --es-hostnames
+      - elasticsearch
+      - --no-config-cortex   # n8n calls Cortex directly; connect TheHive to Cortex in the UI if wanted
+
+  cortex:
+    image: ${CORTEX_IMAGE}
+    container_name: cortex
+    restart: unless-stopped
+    depends_on:
+      - elasticsearch
+      - dockerproxy
+    ports:
+      - "9001:9001"
+    volumes:
+      # Same path inside and outside: the HOST Docker daemon mounts each job folder into the analyzer.
+      # Must be owned by 1001:1001 (Cortex's uid) or jobs fail with AccessDeniedException.
+      - /opt/cortex/jobs:/opt/cortex/jobs
+      - /opt/cortex/no-responders.json:/opt/cortex/no-responders.json:ro
+      # docker { host = "tcp://dockerproxy:2375" }. --docker-host is not a CLI flag (Cortex prints help and exits).
+      - /opt/cortex/application.conf:/etc/cortex/application.conf:ro
+    command:
+      - --secret
+      - ${CORTEX_SECRET}
+      - --es-uri
+      - http://elasticsearch:9200
+      - --job-directory
+      - /opt/cortex/jobs
+      - --docker-job-directory
+      - /opt/cortex/jobs
+      - --responder-url
+      - /opt/cortex/no-responders.json   # empty list: responders are disabled by design (no automated actions)
+
+  n8n:
+    image: ${N8N_IMAGE}
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_SECURE_COOKIE=false            # lab runs over plain http on a private segment
+      - WEBHOOK_URL=http://${SERVICES_IP}:5678/
+      - GENERIC_TIMEZONE=UTC
+      - N8N_DIAGNOSTICS_ENABLED=false
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  cassandra_data:
+  elasticsearch_data:
+  thehive_data:
+  n8n_data:

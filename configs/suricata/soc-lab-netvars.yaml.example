@@ -1,0 +1,17 @@
+# Agentic SOC: OPNsense Suricata network variables drop-in.
+# Path on OPNsense: /usr/local/etc/suricata/conf.d/soc-lab-netvars.yaml
+#
+# OPNsense hardcodes EXTERNAL_NET in its template. This drop-in overrides the whole "vars" key,
+# so it must be a FULL copy of the generated block, not just the two lines below:
+#   1. grep -n -A40 '^vars:' /usr/local/etc/suricata/suricata.yaml   (copy the generated block)
+#   2. paste it here, then change only HOME_NET and EXTERNAL_NET
+#   3. /usr/local/bin/suricata -T -c /usr/local/etc/suricata/suricata.yaml && echo CONFIG_OK
+#   4. configctl ids restart   (rules take about 2 minutes to load)
+# Keep HOME_NET in sync with the GUI "homenet" setting. Revert: delete this file and restart.
+vars:
+  address-groups:
+    HOME_NET: "[<LAB_LAN_CIDR>,<LAB_INFRA_CIDR>]"
+    EXTERNAL_NET: "any"
+    # ... the rest of the generated address-groups (HTTP_SERVERS, DNS_SERVERS, ...) unchanged
+  port-groups:
+    # ... the generated port-groups unchanged

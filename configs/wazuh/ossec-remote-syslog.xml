@@ -1,0 +1,9 @@
+<!-- Agentic SOC: syslog listener for OPNsense/Suricata. Add inside <ossec_config> on the MANAGER,
+     next to the existing <remote> block for agents (1514). allowed-ips is the security control:
+     without it anything on the network could inject events into the SIEM. -->
+<remote>
+  <connection>syslog</connection>
+  <port>514</port>
+  <protocol>udp</protocol>
+  <allowed-ips>${OPNSENSE_WAN_IP}</allowed-ips>
+</remote>

@@ -1,0 +1,825 @@
+{
+  "name": "Agentic SOC - Wazuh alert pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wazuh-alert",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -96,
+        0
+      ],
+      "id": "59971172-435d-424b-9ec6-7ac5f14bf428",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bc774e65-33dc-47e5-acb7-a0bd54b98bbb",
+              "leftValue": "={{ $json.rule_level }}",
+              "rightValue": 5,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "6047603a-f74a-4522-b29e-e4641b1acada",
+              "leftValue": "={{ !($json.rule_groups || []).includes('ossec') || (($json.rule_groups || []).includes('syscheck') && /^(\\/private)?\\/etc\\/(cron[^\\/]*|crontab|anacrontab|systemd\\/system|init\\.d|rc[0-9S]\\.d|rc\\.local|profile|profile\\.d|bash\\.bashrc|zshrc|zprofile|environment|ld\\.so\\.preload|ld\\.so\\.conf(\\.d)?|sudoers|sudoers\\.d|passwd|shadow|group|gshadow|ssh\\/sshd_config(\\.d)?|pam\\.d|hosts|launchd\\.conf|periodic)(\\/|$)|^\\/Library\\/Launch(Daemons|Agents)\\/|^\\/Users\\/[^\\/]+\\/Library\\/LaunchAgents\\/|^\\/(root|home\\/[^\\/]+)\\/\\.ssh\\/authorized_keys/.test($json.file || '')) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        224,
+        0
+      ],
+      "id": "52791ceb-e5f4-4815-a72c-327502e8939d",
+      "name": "Filter"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://thehive:9000/api/v1/case",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  title: ($json.rule_groups || []).includes('suricata')\n    ? `[suricata] ${$json.signature} (${$json.source_ip || '?'} -> ${$json.dest_ip || '?'})`\n    : `[${$json.agent_name}] ${$json.rule_desc}`,\n  description: [\n    `Agent: ${$json.agent_name} | Rule ${$json.rule_id} (level ${$json.rule_level})`,\n    `Signature: ${$json.signature}`,\n    `Source: ${$json.source_ip || 'n/a'} -> Dest: ${$json.dest_ip || 'n/a'}`,\n    `User: ${$json.user || 'n/a'} | File: ${$json.file || 'n/a'} | Time: ${$json.timestamp}`,\n    `Groups: ${($json.rule_groups || []).join(', ')}`,\n    ``,\n    `L1 triage is posted as a case comment. Awaiting analyst approval.`\n  ].join('\\n'),\n  severity: 2, tlp: 2, pap: 2,\n  tags: ['wazuh', 'automated', `agent:${$json.agent_name}`].concat(($json.rule_groups || []).includes('suricata') || $json.raw?.decoder?.name === 'json' ? ['suricata'] : []),\n  status: 'New'\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "id": "b3a1b261-f343-4dc8-af46-09d9622e044d",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "<HTTPHEADERAUTH_CREDENTIAL_ID>",
+          "name": "TheHive Authorization header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Observables from the normalized alert: Suricata (src_ip/dest_ip) or host (srcip/dstip). Nulls skipped.\nconst n = $('Normalize').first().json;\nconst caseId = $('HTTP Request').first().json._id;\n\nreturn [[n.source_ip, 'Source address'], [n.dest_ip, 'Target address']]\n  .filter(([data]) => data)\n  .map(([data, message]) => ({ json: { caseId, dataType: 'ip', data, message } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        -16
+      ],
+      "id": "cc943f30-c177-4693-b917-7db5ae2224e6",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "resource": "observable",
+        "id": {
+          "__rl": true,
+          "value": "={{ $json.caseId }}",
+          "mode": "id"
+        },
+        "dataType": "={{ $json.dataType }}",
+        "data": "={{ $json.data }}",
+        "observableFields": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ioc": false,
+            "sighted": true,
+            "ignoreSimilarity": false,
+            "message": "={{ $json.message }}",
+            "tlp": 2,
+            "tags": "wazuh, automated",
+            "pap": 2
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "displayName": "Start Date",
+              "id": "startDate",
+              "type": "dateTime",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Description",
+              "id": "message",
+              "type": "string",
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Tags",
+              "id": "tags",
+              "type": "string",
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "TLP (Confidentiality of information)",
+              "id": "tlp",
+              "type": "options",
+              "options": [
+                {
+                  "name": "White",
+                  "value": 0
+                },
+                {
+                  "name": "Green",
+                  "value": 1
+                },
+                {
+                  "name": "Amber",
+                  "value": 2
+                },
+                {
+                  "name": "Red",
+                  "value": 3
+                }
+              ],
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "PAP (Level of exposure of information)",
+              "id": "pap",
+              "type": "options",
+              "options": [
+                {
+                  "name": "White",
+                  "value": 0
+                },
+                {
+                  "name": "Green",
+                  "value": 1
+                },
+                {
+                  "name": "Amber",
+                  "value": 2
+                },
+                {
+                  "name": "Red",
+                  "value": 3
+                }
+              ],
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "IOC",
+              "id": "ioc",
+              "type": "boolean",
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Sighted",
+              "id": "sighted",
+              "type": "boolean",
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Sighted At",
+              "id": "sightedAt",
+              "type": "dateTime",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Ignore Similarity",
+              "id": "ignoreSimilarity",
+              "type": "boolean",
+              "removed": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Is Zip",
+              "id": "isZip",
+              "type": "boolean",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "displayName": "Zip Password",
+              "id": "zipPassword",
+              "type": "string",
+              "removed": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "n8n-nodes-base.theHiveProject",
+      "typeVersion": 1,
+      "position": [
+        1216,
+        -16
+      ],
+      "id": "e95fa586-77ba-40c3-8776-86cdb3cc53c7",
+      "name": "Create an observable",
+      "credentials": {
+        "theHiveProjectApi": {
+          "id": "<THEHIVEPROJECTAPI_CREDENTIAL_ID>",
+          "name": "The Hive 5 account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "analyzer": "={{ $json.analyzer }}",
+        "observableType": "ip",
+        "observableValue": "={{ $json.data }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.cortex",
+      "typeVersion": 1,
+      "position": [
+        1408,
+        -16
+      ],
+      "id": "659ea1f5-ff75-4ae4-a237-20ef2ce7bdb2",
+      "name": "Execute an analyzer",
+      "credentials": {
+        "cortexApi": {
+          "id": "<CORTEXAPI_CREDENTIAL_ID>",
+          "name": "Cortex account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=http://cortex:9001/api/job/{{ $json.id }}/waitreport?atMost=1minute",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cortexApi",
+        "options": {
+          "timeout": 75000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1776,
+        -16
+      ],
+      "id": "90330c41-2703-4bbf-a805-f104c0a265cb",
+      "name": "Get Cortex Report",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "cortexApi": {
+          "id": "<CORTEXAPI_CREDENTIAL_ID>",
+          "name": "Cortex account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const alert = $('Webhook').first().json.body;\nconst caseId = $('Code in JavaScript').first().json.caseId;\n\n// Each item is a Cortex waitreport response (Cortex waits up to 1 minute for the job).\n// Success  -> taxonomies.  Failure -> the analyzer finished with an error (reported as such).\n// Anything else (Waiting/InProgress after the limit, or a request error) -> unavailable. Never \"clean\".\nconst findings = [];\n\nfor (const item of $input.all()) {\n  const j = item.json;\n  const addr = j.data || 'unknown';\n  const worker = j.workerName || 'analyzer';\n\n  if (j.status === 'Success' && j.report?.summary?.taxonomies) {\n    const tax = j.report.summary.taxonomies\n      .map(t => `${t.predicate} ${t.value} (${t.level})`)\n      .join(', ');\n    findings.push(`${worker} on ${addr}: ${tax || 'finished, no taxonomies returned'}`);\n  } else if (j.status === 'Failure') {\n    findings.push(`${worker} on ${addr}: analyzer finished with an error: ${j.errorMessage || j.report?.errorMessage || 'no message'}`);\n  } else {\n    findings.push(`${worker} on ${addr}: unavailable (job did not finish within 60s${j.status ? ', last status ' + j.status : ''})`);\n  }\n}\n\nreturn [{\n  json: {\n    caseId,\n    alert,\n    enrichment: findings.join('\\n'),\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1968,
+        -16
+      ],
+      "id": "fb71fa8d-6927-45dc-b8d5-98fff8e16272",
+      "name": "Build Enrichment Summary"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ \"Triage this alert.\\n\\nAgent: \" + ($json.alert.agent?.name || \"unknown\") + \"\\nAlert: \" + $json.alert.rule.description + \"\\nLevel: \" + $json.alert.rule.level + \"\\nGroups: \" + JSON.stringify($json.alert.rule.groups) + \"\\nSource: \" + ($json.alert.data?.src_ip || $json.alert.data?.srcip || \"unknown\") + \"\\nDestination: \" + ($json.alert.data?.dest_ip || $json.alert.data?.dstip || \"unknown\") + \"\\nDest port: \" + ($json.alert.data?.dest_port || \"unknown\") + \"\\nUser: \" + ($json.alert.data?.dstuser || $json.alert.data?.srcuser || \"none\") + \"\\nFile: \" + ($json.alert.syscheck?.path || \"none\") + \"\\nSignature: \" + ($json.alert.data?.alert?.signature || \"none\") + \"\\n\\nEnrichment:\\n\" + $json.enrichment }}",
+        "options": {
+          "systemMessage": "You are a Level 1 SOC analyst. You triage alerts and never take action. You have no tools and no credentials. A human reviews everything you write. Work only from the evidence given. Where evidence is missing, write unknown rather than guessing. Consider benign explanations before malicious ones. This is a lab: <LAB_LAN_CIDR> is the protected internal segment, <LAB_INFRA_CIDR> holds lab infrastructure including a Kali machine used for authorised testing. Reputation data is evidence, not proof; a safe score does not clear an address. Return ONE json object with these keys and nothing else: verdict (true_positive|false_positive|needs_investigation), confidence (high|medium|low), severity (critical|high|medium|low|informational), alert_class (reconnaissance|exploitation|malware|policy_violation|authentication|data_movement|availability|other), summary (2-3 sentences for a human), reasoning (3-5 sentences including the benign explanation you considered), escalate (true|false), recommended_next_steps (array of 2-4 read-only investigative actions)."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1376,
+        208
+      ],
+      "id": "08954651-3850-45cf-acb4-ae091a7554b9",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1376,
+        400
+      ],
+      "id": "7792c403-3ce0-4e0d-8678-83a174f28813",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "<OPENAIAPI_CREDENTIAL_ID>",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const agentOut = $('AI Agent').first().json.output;\nconst caseId = $('HTTP Request').first().json._id;\n\nlet verdict;\ntry {\n  verdict = JSON.parse(agentOut);\n} catch (e) {\n  verdict = {\n    verdict: \"needs_investigation\",\n    confidence: \"low\",\n    severity: \"medium\",\n    summary: \"Agent output could not be parsed. Manual triage required.\",\n    reasoning: String(agentOut).slice(0, 500),\n    escalate: true,\n    recommended_next_steps: [\"Review raw alert manually\"]\n  };\n}\n\nconst sevMap = { critical: 4, high: 3, medium: 2, low: 1, informational: 1 };\n\nconst noteBody = [\n  `## L1 Agent Triage`,\n  ``,\n  `**Verdict:** ${verdict.verdict}  (confidence: ${verdict.confidence})`,\n  `**Severity:** ${verdict.severity}`,\n  `**Class:** ${verdict.alert_class}`,\n  `**Escalate:** ${verdict.escalate}`,\n  ``,\n  `### Summary`,\n  verdict.summary,\n  ``,\n  `### Reasoning`,\n  verdict.reasoning,\n  ``,\n  `### Recommended next steps`,\n  ...(verdict.recommended_next_steps || []).map(s => `- ${s}`),\n  ``,\n  `_Generated by L1 agent. Awaiting analyst approval._`\n].join('\\n');\n\nreturn [{\n  json: {\n    caseId,\n    verdict: verdict.verdict,\n    severity: verdict.severity,\n    sevNumber: sevMap[verdict.severity] || 2,\n    escalate: verdict.escalate,\n    noteBody\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1696,
+        208
+      ],
+      "id": "f3cbde64-c782-4b60-9960-8c8acddbb049",
+      "name": "Parse Verdict"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://thehive:9000/api/v1/case/{{ $json.caseId }}/comment",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "theHiveProjectApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: $json.noteBody }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1904,
+        208
+      ],
+      "id": "4083da2c-a365-4be0-a742-b55fad558e9b",
+      "name": "HTTP Request1",
+      "credentials": {
+        "theHiveProjectApi": {
+          "id": "<THEHIVEPROJECTAPI_CREDENTIAL_ID>",
+          "name": "The Hive 5 account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Code node \"Normalize\" (mode: Run Once for All Items).\n// Sits between Webhook and the existing Filter/enrichment chain.\n// Suricata alerts carry data.src_ip / data.dest_ip; host alerts (sshd, syscheck,\n// Kali, Mac) carry data.srcip / data.dstip. This flattens both into one shape.\n// `raw` keeps the original alert, so old references to $json.body.X become $json.raw.X.\nconst out=[];\nfor (const item of $input.all()){\n  const a=item.json.body||item.json, d=a.data||{}, ag=a.agent||{}, r=a.rule||{}, sc=a.syscheck||{};\n  out.push({json:{\n    agent_name:ag.name||'unknown', source_ip:d.src_ip||d.srcip||null,\n    dest_ip:d.dest_ip||d.dstip||null, user:d.dstuser||d.srcuser||null,\n    file:sc.path||null, rule_id:r.id||null, rule_level:r.level||0,\n    rule_desc:r.description||'', rule_groups:r.groups||[],\n    signature:(d.alert&&d.alert.signature)||r.description||'Wazuh alert',\n    timestamp:a.timestamp||null, raw:a }});\n}\nreturn out;\n"
+      },
+      "id": "909a3d60-7b4d-4b76-ade5-ac753ba3547f",
+      "name": "Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        64,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "caa24fe8-deb5-4f6e-806c-ca2181a9e798",
+              "leftValue": "={{ !!($('Normalize').first().json.source_ip || $('Normalize').first().json.dest_ip) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e6499546-d565-4223-986b-1c64ae480eea",
+      "name": "Has IPs?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        848,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Host alerts with no IP (file integrity, local auth...) skip Cortex but still get L1 triage.\n// Same output shape as 'Build Enrichment Summary'.\nreturn [{ json: {\n  caseId: $('HTTP Request').first().json._id,\n  alert: $('Normalize').first().json.raw,\n  enrichment: 'No IP observables on this alert; no reputation lookup performed.',\n} }];"
+      },
+      "id": "8a098042-f3ab-4a91-96dc-38ad5fb1386a",
+      "name": "No-IP Enrichment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://thehive:9000/api/v1/case/{{ $('HTTP Request').first().json._id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "theHiveProjectApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"assignee\": null}",
+        "options": {}
+      },
+      "id": "bc19a8cc-1c18-4a20-b4d1-34d807c40b2e",
+      "name": "Unassign Case",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        656,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "theHiveProjectApi": {
+          "id": "<THEHIVEPROJECTAPI_CREDENTIAL_ID>",
+          "name": "The Hive 5 account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f98bd4e7-eea8-4568-94cf-d1667a98187b",
+              "leftValue": "={{ (Number($('Normalize').first().json.rule_level || 0) >= 10 && (['high','critical'].includes(String($('Parse Verdict').first().json.severity || '').toLowerCase()) || ($('Normalize').first().json.rule_groups || []).includes('authentication_failures'))) || String($('Normalize').first().json.raw?.data?.alert?.severity ?? '') === '1' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5bd28dce-336c-4521-baa8-1989173e3bfc",
+      "name": "Escalate? ((AI high/critical OR brute-force rollup) + level>=10, OR Suricata sev 1)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2128,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "<ALERT_EMAIL>",
+        "toEmail": "<ALERT_EMAIL>",
+        "subject": "=[SOC ESCALATION] {{ $('Parse Verdict').first().json.severity }} on {{ $('Normalize').first().json.agent_name }} - {{ $('Normalize').first().json.rule_desc }}",
+        "emailFormat": "both",
+        "text": "={{ $json.text }}",
+        "options": {},
+        "html": "={{ $json.html }}"
+      },
+      "id": "552f261c-94e4-4e8c-a63b-e31fd192cd60",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2384,
+        192
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "<SMTP_CREDENTIAL_ID>",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "id": "5ca1371f-3404-40ef-b0ac-f5ba436bb35d",
+      "name": "Format Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2274,
+        12
+      ],
+      "parameters": {
+        "jsCode": "// Format Email: turn the L1 markdown note into HTML + a plain-text fallback. Notification only.\nconst pv = $('Parse Verdict').first().json;\nconst nz = $('Normalize').first().json;\nconst caseUrl = `http://<SERVICES_IP>:9000/cases/${$('HTTP Request').first().json._id}/details`;\nconst FIRST = 'L1 agent escalation (notification only; nothing has been actioned).';\n\nconst esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst inline = s => esc(s)\n  .replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>')\n  .replace(/(^|\\s)_([^_]+?)_(?=\\s|$|[.,;:])/g, '$1<em>$2</em>');\n\nfunction mdToHtml(md) {\n  const out = []; let list = false;\n  for (const line of String(md || '').split('\\n')) {\n    const li = line.match(/^\\s*-\\s+(.*)$/);\n    if (li) { if (!list) { out.push('<ul>'); list = true; } out.push(`<li>${inline(li[1])}</li>`); continue; }\n    if (list) { out.push('</ul>'); list = false; }\n    const h = line.match(/^(#{1,6})\\s+(.*)$/);\n    if (h) { const n = Math.min(h[1].length + 1, 6); out.push(`<h${n}>${inline(h[2])}</h${n}>`); }\n    else if (line.trim()) out.push(`<p>${inline(line)}</p>`);\n  }\n  if (list) out.push('</ul>');\n  return out.join('\\n');\n}\nconst mdToText = md => String(md || '').replace(/^#{1,6}\\s+/gm, '').replace(/\\*\\*(.+?)\\*\\*/g, '$1').replace(/(^|\\s)_([^_]+?)_(?=\\s|$|[.,;:])/g, '$1$2');\n\nconst facts = [\n  ['Agent', nz.agent_name],\n  ['Rule', `${nz.rule_id} (level ${nz.rule_level}) - ${nz.rule_desc}`],\n  ['Source', nz.source_ip || 'n/a'],\n  ['Destination', nz.dest_ip || 'n/a'],\n];\n\nconst html = `<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.45;color:#1a1a1a;max-width:720px\">\n<p><strong>${esc(FIRST)}</strong></p>\n<table style=\"border-collapse:collapse;margin:8px 0\">\n${facts.map(([k, v]) => `<tr><td style=\"padding:2px 12px 2px 0;color:#555\">${esc(k)}</td><td style=\"padding:2px 0\">${esc(v)}</td></tr>`).join('\\n')}\n</table>\n<hr style=\"border:none;border-top:1px solid #ddd\">\n${mdToHtml(pv.noteBody)}\n<hr style=\"border:none;border-top:1px solid #ddd\">\n<p>Case: <a href=\"${esc(caseUrl)}\">${esc(caseUrl)}</a></p>\n<p style=\"color:#555\">Status New, unassigned. A human decides every next step.</p>\n</div>`;\n\nconst text = [\n  FIRST, '',\n  ...facts.map(([k, v]) => `${k}: ${v}`), '',\n  mdToText(pv.noteBody), '',\n  `Case: ${caseUrl}`,\n  'Status New, unassigned. A human decides every next step.',\n].join('\\n');\n\nreturn [{ json: { html, text } }];\n"
+      }
+    },
+    {
+      "id": "a9030265-7f38-4c3b-a390-022715719011",
+      "name": "Fan out analyzers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1298,
+        164
+      ],
+      "parameters": {
+        "jsCode": "// One Cortex job per (observable, analyzer). Downstream waitreport + Build Enrichment Summary\n// already handle many results, so the L1 agent still runs once per alert.\nconst analyzers = [\"89b6a8415bce4a0557a2bf15bb5436cd::AbuseIPDB_2_0\", \"0e2a20abae837977fed18ad2359401cd::VirusTotal_GetReport_3_1\"];\nreturn $input.all().flatMap(i => analyzers.map(a => ({ json: { ...i.json, analyzer: a } })));"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Unassign Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Create an observable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an observable": {
+      "main": [
+        [
+          {
+            "node": "Fan out analyzers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute an analyzer": {
+      "main": [
+        [
+          {
+            "node": "Get Cortex Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Cortex Report": {
+      "main": [
+        [
+          {
+            "node": "Build Enrichment Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Enrichment Summary": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse Verdict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Verdict": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Escalate? ((AI high/critical OR brute-force rollup) + level>=10, OR Suricata sev 1)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has IPs?": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No-IP Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No-IP Enrichment": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unassign Case": {
+      "main": [
+        [
+          {
+            "node": "Has IPs?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Email": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalate? ((AI high/critical OR brute-force rollup) + level>=10, OR Suricata sev 1)": {
+      "main": [
+        [
+          {
+            "node": "Format Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fan out analyzers": {
+      "main": [
+        [
+          {
+            "node": "Execute an analyzer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "active": false,
+  "pinData": {}
+}

@@ -1,0 +1,11 @@
+<!-- SOC lab 2026-10-01: Zeek conn.log from victim01 (JSON with "_" field names, decoded by the built-in json decoder).
+     Matched on Zeek's own fields (uid "C...", conn_state), not the file path.
+     Level 3 on purpose: searchable in Wazuh, BELOW the n8n integration threshold (5), so no cases/emails/OpenAI calls. -->
+<group name="soc_lab,zeek,">
+  <rule id="100310" level="3">
+    <decoded_as>json</decoded_as>
+    <field name="uid">^C\w+$</field>
+    <field name="conn_state">\w</field>
+    <description>Zeek conn: $(id_orig_h):$(id_orig_p) -> $(id_resp_h):$(id_resp_p) $(proto) $(conn_state)</description>
+  </rule>
+</group>

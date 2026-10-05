@@ -1,0 +1,9 @@
+<!-- Agentic SOC: send every alert of level 5 or higher, from every agent, to the n8n webhook.
+     Add inside <ossec_config> on the MANAGER (sibling of <global>). No rule_id or group filter:
+     n8n's Filter node decides what becomes a case. Raise <level> if the volume is too high. -->
+<integration>
+  <name>custom-n8n</name>
+  <hook_url>http://${SERVICES_IP}:5678/webhook/wazuh-alert</hook_url>
+  <level>5</level>
+  <alert_format>json</alert_format>
+</integration>

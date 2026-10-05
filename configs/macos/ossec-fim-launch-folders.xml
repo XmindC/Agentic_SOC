@@ -1,0 +1,3 @@
+<!-- Agentic SOC: macOS persistence folders for file-integrity monitoring. Add inside <syscheck> in
+     /Library/Ossec/etc/ossec.conf on the Mac agent. Paths only leave the Mac (report_changes is off). -->
+<directories>/Library/LaunchDaemons,/Library/LaunchAgents,/Users/<user>/Library/LaunchAgents</directories>

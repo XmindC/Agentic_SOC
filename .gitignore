@@ -1,0 +1,60 @@
+# --- Secrets: never commit. Real values live in .env (copied from .env.example). ---
+.env
+.env.*
+!.env.example
+*secret*
+!.gitleaks.toml
+*.secrets
+*credential*
+!configs/n8n/*.workflow.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.csr
+id_rsa*
+id_ed25519*
+*.kdbx
+wazuh-install-files.tar
+wazuh-passwords.txt
+
+# --- Live exports that may embed credentials or personal data ---
+**/backups/
+*.bak
+*.bak-*
+docker-compose.override.yml
+
+# --- Virtual machines, disk images, captures: far too large for Git ---
+*.vmwarevm/
+*.vmdk
+*.vmem
+*.vmsn
+*.iso
+*.img
+*.ova
+*.ovf
+*.qcow2
+*.pcap
+*.pcapng
+
+# --- Logs and runtime data ---
+*.log
+logs/
+/var/
+
+# --- Source documents kept outside the repo (converted copies live in docs/) ---
+*.docx
+*.pdf
+*.zip
+
+# --- Tooling ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+node_modules/
+.claude/
+.vscode/
+.idea/
+.DS_Store

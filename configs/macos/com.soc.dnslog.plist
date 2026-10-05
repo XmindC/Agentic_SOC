@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- SOC lab: passive DNS logger for the Mac. tcpdump only READS packets; it takes no action.
+     The command is inline (no wrapper file) so nothing user-writable is ever run as root.
+     The pid file lets newsyslog stop tcpdump at rotation; KeepAlive restarts it on a fresh log. -->
+<dict>
+    <key>Label</key>
+    <string>com.soc.dnslog</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>echo $$ &gt; /var/run/soc-dnslog.pid; exec /usr/sbin/tcpdump -l -n -tttt -i any 'udp port 53 or tcp port 53'</string>
+    </array>
+    <!-- umask 027 (decimal 23): log files launchd creates are 640, not world-readable -->
+    <key>Umask</key>
+    <integer>23</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/var/log/dns-queries.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/dns-queries.err</string>
+</dict>
+</plist>

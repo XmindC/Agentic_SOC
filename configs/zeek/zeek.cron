@@ -1,0 +1,4 @@
+# Agentic SOC: /etc/cron.d/zeek on victim01 (root 644). Starts Zeek at boot and lets zeekctl
+# restart it and rotate logs every 5 minutes.
+@reboot root /opt/zeek/bin/zeekctl start
+*/5 * * * * root /opt/zeek/bin/zeekctl cron
