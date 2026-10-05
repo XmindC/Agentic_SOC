@@ -95,3 +95,7 @@ Every role accepts `--dry-run`, backs up each file before editing it, tests the 
 ## Status
 
 Working end to end since 1 October 2026: Suricata and host alerts from four agents become enriched, triaged TheHive cases, and high-severity ones send an email. Next on the roadmap are the detection-engineering agent, wiring the L2 agent into the workflow, and one approval-gated response action (block an address at OPNsense). See [docs/01-plan](docs/01-plan/README.md).
+
+## License
+
+[MIT](LICENSE). Use, copy, modify and share it, including for your own courses, as long as the copyright notice and licence text stay with it. The tools the installer downloads (Wazuh, n8n, TheHive, Cortex, Suricata, Zeek and the rest) keep their own licences.
