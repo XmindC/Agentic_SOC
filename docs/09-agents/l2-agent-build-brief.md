@@ -6,22 +6,22 @@ Paste this to Copilot (or hand it to <ORG_NAME>) as the task. It produces **real
 
 ## The task to give Copilot
 
-> Write a real, runnable Python script named `agent-l2-investigation.py` in `agents/`. It is the Level 2 SOC investigation agent. It must not take any action — it only reads facts and returns a written proposal for a human to approve. Log the file in `logs/log-file-index.md`. The full L2 system prompt is included at the bottom of this document — paste it into the script. There is no external file to find. Requirements below.
+> Write a real, runnable Python script named `agent-l2-investigation.py` in `agents/`. It is the Level 2 SOC investigation agent. It must not take any action. It only reads facts and returns a written proposal for a human to approve. Log the file in `logs/log-file-index.md`. The full L2 system prompt is at the bottom of this document; paste it into the script. There is no external file to find. Requirements below.
 
 ## What the script must do
 
-1. **Take input**: an escalated alert (the L1 verdict + the original alert + any enrichment), as JSON — from a file path argument or stdin.
-2. **Call the model**: send the L2 system prompt (given in full at the bottom of this doc) + the alert to the OpenAI API (`gpt-4o-mini`), reading the key from `config/config-secrets.env` (never hard-coded).
-3. **Get back**: a JSON investigation — assessment, timeline, root-cause hypothesis, alternative hypothesis, scope, indicators, containment proposals (each marked reversible + collateral risk), and the one question the human must answer.
-4. **Parse safely**: wrap the JSON parse in try/except; on failure, return a fixed object that says "manual investigation required" so nothing breaks.
-5. **Output**: print the structured result, and optionally post it to a TheHive case (as a comment) only if a `--case-id` is given — and even then, print first, post second, never act on the environment.
-6. **Never**: block, isolate, disable, delete, or change any rule or setting. It has no credentials for those and must not be given any.
+1. Take input: an escalated alert (the L1 verdict, the original alert and any enrichment) as JSON, from a file path argument or stdin.
+2. Call the model: send the L2 system prompt (in full at the bottom of this document) and the alert to the OpenAI API (`gpt-4o-mini`), reading the key from `config/config-secrets.env` (never hard-coded).
+3. Get back a JSON investigation: assessment, timeline, root-cause hypothesis, alternative hypothesis, scope, indicators, containment proposals (each marked reversible + collateral risk), and the one question the human must answer.
+4. Parse safely: wrap the JSON parse in try/except; on failure, return a fixed object that says "manual investigation required" so nothing breaks.
+5. Output: print the structured result. Post it to a TheHive case as a comment only if a `--case-id` is given, and even then print first, post second, and never act on the environment.
+6. Never block, isolate, disable, delete, or change any rule or setting. It has no credentials for those and must not be given any.
 
 ## Skeleton to build from
 
 ```python
 #!/usr/bin/env python3
-"""agent-l2-investigation.py — SOC Level 2 investigation agent.
+"""agent-l2-investigation.py: SOC Level 2 investigation agent.
 Reads an escalated alert, returns a written investigation + containment PROPOSAL.
 Takes no action. A human approves everything."""
 
@@ -89,7 +89,7 @@ def main():
     print(json.dumps(result, indent=2))   # human reads this first
 
     if args.case_id:
-        # OPTIONAL: post as a case comment. This is advisory text only — never an action.
+        # OPTIONAL: post as a case comment. This is advisory text only, never an action.
         # Fill in the TheHive comment POST here if wanted, using the key from secrets.
         pass
 
@@ -102,11 +102,11 @@ if __name__ == "__main__":
 - Run it against a sample escalated alert: `python agents/agent-l2-investigation.py --input sample-alert.json`
 - Confirm it prints a structured investigation with containment **proposals**, not actions.
 - Confirm the key is read from `config/config-secrets.env`, never printed, never hard-coded.
-- Log it: add `agents/agent-l2-investigation.py — Level 2 investigation agent (advisory only)` to `logs/log-file-index.md`.
+- Log it: add `agents/agent-l2-investigation.py: Level 2 investigation agent (advisory only)` to `logs/log-file-index.md`.
 
 ## The guardrail to verify in the output
 
-The containment section must be **proposals a human approves**, each with `reversible` and `collateral_risk`. If the script ever calls the firewall, Wazuh, or an account system directly, that is wrong — stop and remove it. L2 advises; n8n (with human approval) acts.
+The containment section must be proposals a human approves, each with `reversible` and `collateral_risk`. If the script ever calls the firewall, Wazuh, or an account system directly, that is wrong: stop and remove it. L2 advises; n8n (with human approval) acts.
 
 ---
 

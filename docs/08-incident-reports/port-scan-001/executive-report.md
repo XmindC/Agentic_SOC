@@ -1,6 +1,6 @@
 > Source: `report-exec-port-scan-001-20260927.md` (lab session notes). Screenshots and personal details were removed for publication; commands are unchanged except where marked.
 
-# Executive Incident Report
+# Executive incident report
 
 Case ID: port-scan-001  
 Date: 2026-09-27

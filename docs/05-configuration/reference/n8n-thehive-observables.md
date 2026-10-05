@@ -174,7 +174,7 @@ One more error, and a useful one
 
 **TheHive has no port observable type.** That was an error in the original Code node rather than anything to do with n8n. The port observable was dropped, which costs nothing since a port number on its own cannot be analysed by anything.
 
-Worth noting how much better this error was than the ones before it. It named the exact problem rather than reporting a generic failure, which is the dedicated node earning its place.
+This error was much better than the ones before it. It named the exact problem rather than reporting a generic failure, which is the dedicated node earning its place.
 
 Success
 

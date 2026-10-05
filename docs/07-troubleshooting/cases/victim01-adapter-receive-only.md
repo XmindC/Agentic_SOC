@@ -19,7 +19,7 @@ The symptom
 
 *The Wazuh endpoints view. Two agents active, victim01 disconnected. The only machine actually inside the monitored network was the one not reporting.*
 
-Worth noting what this costs. victim01 is the only host on <LAB_LAN_CIDR>, so with it disconnected the lab had network detection through Suricata but no endpoint telemetry at all.
+This had a real cost. victim01 is the only host on <LAB_LAN_CIDR>, so with it disconnected the lab had network detection through Suricata but no endpoint telemetry at all.
 
 First checks
 

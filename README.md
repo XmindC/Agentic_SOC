@@ -4,7 +4,7 @@ A security operations centre that fits on one laptop, where an AI analyst does t
 
 A Kali machine fires an nmap scan at a victim server. Within about a minute, Suricata on the OPNsense firewall has flagged it and Wazuh has turned it into an alert. n8n has opened a case in TheHive and asked AbuseIPDB and VirusTotal what they know about both addresses. A gpt-4o-mini Level 1 analyst has then read the facts and written a verdict on the case: what it thinks happened, how sure it is, the innocent explanation it considered, and what a person should check next. If the alert is serious enough, an HTML email lands in the analyst's inbox with a link to the case.
 
-Nothing has been blocked, isolated or deleted. The case sits there, New and unassigned, until a human reads it. The AI holds no passwords and no tools. It can only return text, so even a fully compromised model cannot touch the network. That split of authority is the point of the project: **the workflow acts, the case system stores, the agent advises, the human decides.**
+Nothing has been blocked, isolated or deleted. The case sits there, New and unassigned, until a human reads it. The AI holds no passwords and no tools. It can only return text, so even a fully compromised model cannot touch the network. That split of authority is the point of the project: the workflow acts, the case system stores, the agent advises, and the human decides.
 
 It is built as a teaching lab for enterprise SOC and incident response work, from free and open-source parts, on one Intel Mac running VMware Fusion.
 

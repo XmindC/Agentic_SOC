@@ -1,4 +1,6 @@
-# SOC Lab — Central Reference (single source of truth)
+# Lab reference
+
+This page is the single source of truth for the lab: machines, addresses, the pipeline and the working rules.
 
 Updated 2026-10-01 from `lab-changes-20260930/RUNBOOK.md` (full change history, backups and rollbacks live there).
 
@@ -16,7 +18,7 @@ Updated 2026-10-01 from `lab-changes-20260930/RUNBOOK.md` (full change history, 
 ## Wazuh agents (agent_control -l)
 | ID | Name | What |
 |----|------|------|
-| 000 | wazuhserver | the manager itself. **Suricata alerts also show as `wazuhserver`** (they arrive via syslog 514 on the manager) |
+| 000 | wazuhserver | the manager itself. Suricata alerts also show as `wazuhserver`, because they arrive via syslog 514 on the manager |
 | 001 | kali | Kali |
 | 002 | MacOS | the Mac host |
 | 003 | sensor | victim01 (<VICTIM_IP>) |
@@ -27,26 +29,26 @@ Updated 2026-10-01 from `lab-changes-20260930/RUNBOOK.md` (full change history, 
 - n8n:      http://<SERVICES_IP>:5678 (workflow "My workflow", id iyHu7OIXelaZAC1K)
 - TheHive:  http://<SERVICES_IP>:9000 (<THEHIVE_ANALYST_USER>) ; case URL: /cases/<_id>/details
 - Cortex:   http://<SERVICES_IP>:9001
-- Wazuh indexer: https://127.0.0.1:9200 **on the manager only** (not exposed); read-only user `claude_ro`
+- Wazuh indexer: https://127.0.0.1:9200 on the manager only (not exposed); read-only user `soc_ro`
 
-## Containers (services01, ~/soc-stack — six services)
+## Containers (services01, ~/soc-stack, six services)
 n8n | cassandra | elasticsearch | thehive (5.2) | cortex (4.1.0-1) | dockerproxy
 Start: `cd ~/soc-stack && docker compose start`  |  Status: `docker compose ps`
 Cassandra ready = `docker exec cassandra nodetool status` shows UN.
 
 ## Detection sources
-- **Suricata** (OPNsense, IDS/pcap mode, **IPS OFF**) on em1 (<LAB_LAN_CIDR>) **and em0** (<LAB_INFRA_CIDR>).
+- Suricata (OPNsense, IDS/pcap mode, IPS off) on em1 (<LAB_LAN_CIDR>) and em0 (<LAB_INFRA_CIDR>).
   HOME_NET = <LAB_LAN_CIDR>,<LAB_INFRA_CIDR> ; EXTERNAL_NET = any (drop-in `conf.d/soc-lab-netvars.yaml`).
   DNS events logged to eve.json (drop-in `conf.d/soc-lab-dns.yaml`); only alerts go to Wazuh (syslog).
   Limit: Kali <-> <LAB_INFRA_CIDR> traffic and the Mac's own internet traffic never cross OPNsense (VMware vswitch).
-- **Wazuh integration**: every alert **level >= 5** from **all agents** -> n8n webhook (`custom-n8n`, no rule_id/group filter).
-- **Mac DNS**: launchd `com.soc.dnslog` (tcpdump, read-only, Umask 027) -> /var/log/dns-queries.log -> Mac agent
-  -> rule **100300 level 3** (decoder soc-mac-dns). **Never reaches n8n/OpenAI** (below level 5), by design.
-- **FIM (syscheck)**, scheduled every 12 h (the first scan after an agent restart is a silent baseline):
-  Mac: /etc, /usr/bin, /usr/sbin, /bin, /sbin, **/Library/LaunchDaemons, /Library/LaunchAgents, /Users/<user>/Library/LaunchAgents**.
-  Kali: /etc, /usr/bin, /usr/sbin, /bin, /sbin, /boot, **/root/.ssh, /home/{kali,<LAB_USER_1>,<LAB_USER_2>}/.ssh** (known_hosts ignored).
-  victim01: /etc, /usr/bin, /usr/sbin, /bin, /sbin, /boot, **/root/.ssh, /home/sensor/.ssh** (known_hosts ignored).
-- **Zeek** (victim01): standalone on ens37, JSON logs in /opt/zeek/logs (7-day expiry), /etc/cron.d/zeek keeps it running; conn.log read by the Wazuh agent -> rule **100310 level 3** (searchable alerts, never n8n). Zeek uses "_" field names (id_orig_h) because dotted names collide with data.id in the index.
+- Wazuh integration: every alert of level 5 or higher, from all agents, goes to the n8n webhook (`custom-n8n`, no rule_id/group filter).
+- Mac DNS: launchd `com.soc.dnslog` (tcpdump, read-only, Umask 027) -> /var/log/dns-queries.log -> Mac agent
+  -> rule 100300, level 3 (decoder soc-mac-dns). It never reaches n8n or OpenAI, because it is below level 5. That is deliberate.
+- FIM (syscheck), scheduled every 12 h (the first scan after an agent restart is a silent baseline):
+  Mac: /etc, /usr/bin, /usr/sbin, /bin, /sbin, /Library/LaunchDaemons, /Library/LaunchAgents, /Users/<user>/Library/LaunchAgents.
+  Kali: /etc, /usr/bin, /usr/sbin, /bin, /sbin, /boot, /root/.ssh, /home/{kali,<LAB_USER_1>,<LAB_USER_2>}/.ssh (known_hosts ignored).
+  victim01: /etc, /usr/bin, /usr/sbin, /bin, /sbin, /boot, /root/.ssh, /home/sensor/.ssh (known_hosts ignored).
+- Zeek (victim01): standalone on ens37, JSON logs in /opt/zeek/logs (7-day expiry), /etc/cron.d/zeek keeps it running; conn.log read by the Wazuh agent -> rule 100310, level 3 (searchable alerts, never n8n). Zeek uses "_" field names (id_orig_h) because dotted names collide with data.id in the index.
 
 ## The pipeline (n8n, current order)
 Webhook -> **Normalize** (flat fields: agent_name, source_ip/dest_ip from src_ip|srcip, user, file, rule_*, signature, raw)
@@ -61,7 +63,7 @@ Webhook -> **Normalize** (flat fields: agent_name, source_ip/dest_ip from src_ip
 -> **Post comment** (`HTTP Request1`) -> **Escalate?** -> Format Email (HTML + text) -> **Send Email** (Gmail SMTP, notification only)
 Escalation email fires when: (rule_level >= 10 AND (AI severity high/critical OR group `authentication_failures`))
 OR Suricata `data.alert.severity == 1`.
-Cases stay **New and unassigned**; agents advise only; a human approves every action.
+Cases stay New and unassigned. Agents advise only, and a human approves every action.
 
 ## Connectors
 - n8n -> TheHive: "The Hive 5 account" (+ "Authorization" header credential for case creation)
@@ -75,14 +77,14 @@ Cases stay **New and unassigned**; agents advise only; a human approves every ac
 ## Cortex accounts
 kali (superadmin) | soclabadmin (orgadmin) | n8n (API only, key in n8n)
 
-## Secrets (NEVER commit — config/config-secrets.env, mode 600)
-Variables: OPENAI_API_KEY (ROTATE if not done — was exposed) | N8N_API_KEY | WAZUH_INDEXER_USER / WAZUH_INDEXER_PASS (read-only).
+## Secrets (never commit; they live in config/config-secrets.env, mode 600)
+Variables: OPENAI_API_KEY | N8N_API_KEY | WAZUH_INDEXER_USER / WAZUH_INDEXER_PASS (read-only).
 Other secrets live only in n8n's credential store or the services themselves.
 Never put a secret on a command line: pass it to curl via stdin (`curl -K -`).
 
 ## Working rules learned
 - Fetch the LIVE n8n workflow right before any API update (the owner also edits in the UI); back up first.
-- Root on the manager or the Mac: temporary, scoped `/etc/sudoers.d/claude-*` rule, deleted after use.
+- Root on the manager or the Mac: temporary, scoped `/etc/sudoers.d/tmp-*` rule, deleted after use.
 - On this Mac, Python cannot reach the lab LAN (macOS Local Network privacy); use curl.
 
 ## Cold-start checklist (after any Mac restart)
@@ -96,7 +98,7 @@ Never put a secret on a command line: pass it to curl via stdin (`curl -K -`).
 7. Confirm a new `[suricata] ...` case appears in TheHive (New, unassigned, L1 comment).
 
 ## Known behaviours (not faults)
-- Wazuh suppresses repeated identical alerts (firedtimes) — vary the scan port.
+- Wazuh suppresses repeated identical alerts (firedtimes), so vary the scan port.
 - Cortex caches identical lookups for 10 minutes (cacheTag); VirusTotal free tier is about 4 lookups/min.
 - Clock skew between machines (Mac UTC+1, Kali UTC-4, OPNsense UTC+1, manager/n8n UTC).
 - Suricata restart takes ~2 min to load rules before it detects anything.
